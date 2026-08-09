@@ -1,0 +1,25 @@
+{
+  "name": "test-api",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node addAddress.js",
+    "getmap": "node getMap.js",
+    "login": "node loginF.js",
+    "api2": "node api2.js",
+    "api": "node api.js",
+    "getdelivery": "node getdelivery.js",
+    "addmgg": "node addmgg.js",
+    "login2": "node loginFbody.js"
+  },
+  "description": "",
+  "main": "addAddress.js",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "pg": "^8.23.0"
+  },
+  "devDependencies": {}
+}
