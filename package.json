@@ -15,7 +15,7 @@
     "addAddress":"node addAddress.js"
   },
   "description": "",
-  "main": "addAddress.js",
+  "main": "loginFbody.js",
   "keywords": [],
   "author": "",
   "license": "ISC",
