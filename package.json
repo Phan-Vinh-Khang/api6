@@ -3,14 +3,16 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "start": "node addAddress.js",
+    "start":"node loginFbody.js",
     "getmap": "node getMap.js",
     "login": "node loginF.js",
     "api2": "node api2.js",
     "api": "node api.js",
     "getdelivery": "node getdelivery.js",
     "addmgg": "node addmgg.js",
-    "login2": "node loginFbody.js"
+    "login2": "node loginFbody.js",
+    "getdelivery2": "node getdelivery2.js",
+    "addAddress":"node addAddress.js"
   },
   "description": "",
   "main": "addAddress.js",
