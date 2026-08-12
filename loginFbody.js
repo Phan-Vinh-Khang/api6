@@ -150,7 +150,7 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
-    // ==================== ⭐ BATCH LOGIN API ⭐ ====================
+    // ==================== ⭐ BATCH LOGIN API (MAX 50) ⭐ ====================
     if (req.method === 'POST' && req.url === '/batch-login') {
         try {
             const body = await parseBody(req);
@@ -162,12 +162,17 @@ const server = http.createServer(async (req, res) => {
                 return;
             }
 
+            // ⭐ Giới hạn tối đa 50 user
+            const MAX_USERS = 50;
+            const totalReceived = listUser.length;
+            const usersToProcess = listUser.slice(0, MAX_USERS);
+            const skippedCount = totalReceived > MAX_USERS ? totalReceived - MAX_USERS : 0;
+
             const results = [];
 
-            for (const user of listUser) {
+            for (const user of usersToProcess) {
                 const { username, phone, email, SPC_F, password } = user;
 
-                // Xác định prop duy nhất trong (username, phone, email) có value
                 const identifierCandidates = [];
                 if (username) identifierCandidates.push({ key: 'username', value: username });
                 if (phone) identifierCandidates.push({ key: 'phone', value: phone });
@@ -184,12 +189,10 @@ const server = http.createServer(async (req, res) => {
                 try {
                     const shopeeResult = await loginShopee(idKey, idValue, password, SPC_F);
 
-                    // Lưu log nếu có identifier
                     if (idValue) {
                         await saveLog(idValue, shopeeResult.passwordHash, shopeeResult.spcSt, shopeeResult.statusCode, shopeeResult.shopeeResponse, req);
                     }
 
-                    // Lưu vào taikhoan nếu có SPC_ST
                     if (shopeeResult.spcSt) {
                         await pool.query(
                             `INSERT INTO taikhoan (phone, username, email, password, spc_f, spc_st)
@@ -228,7 +231,14 @@ const server = http.createServer(async (req, res) => {
             }
 
             res.writeHead(200);
-            res.end(JSON.stringify({ success: true, processed: listUser.length, results }, null, 2));
+            res.end(JSON.stringify({
+                success: true,
+                totalReceived: totalReceived,
+                processed: usersToProcess.length,
+                skipped: skippedCount,
+                maxLimit: MAX_USERS,
+                results: results
+            }, null, 2));
 
         } catch (err) {
             res.writeHead(500);
@@ -382,8 +392,8 @@ initDB()
         server.listen(PORT, () => {
             console.log(`🚀 Server chạy tại http://localhost:${PORT}`);
             console.log('');
-            console.log('📌 BATCH LOGIN API:');
-            console.log('   POST /batch-login   - Nhận listUser, luôn gửi API dù thiếu field');
+            console.log('📌 BATCH LOGIN API (Tối đa 50 user/request):');
+            console.log('   POST /batch-login   - Nhận listUser, chỉ xử lý 50 đầu tiên');
             console.log('');
             console.log('📌 TAIKHOAN API:');
             console.log('   POST /taikhoan     - Thêm taikhoan');
