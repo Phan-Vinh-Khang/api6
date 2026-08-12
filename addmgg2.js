@@ -5,7 +5,7 @@ const zlib = require('zlib');
 const fs = require('fs');
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3000;
 
 // ✅ Bật CORS để React localhost:3000 có thể gọi được
 app.use(cors());
