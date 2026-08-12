@@ -10,12 +10,9 @@ const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://cookiedb_3atl_use
 // ==================== DATABASE ====================
 const pool = new Pool({
     connectionString: DATABASE_URL,
-    ssl: {
-        rejectUnauthorized: false
-    }
+    ssl: { rejectUnauthorized: false }
 });
 
-// Chỉ kiểm tra kết nối, không tạo table
 async function initDB() {
     const client = await pool.connect();
     try {
@@ -26,27 +23,6 @@ async function initDB() {
         throw err;
     } finally {
         client.release();
-    }
-}
-
-// ⭐ Tự động insert test data bảng taikhoan khi khởi động
-async function insertTestTaikhoan() {
-    try {
-        await pool.query(
-            `INSERT INTO taikhoan (phone, username, email, password, spc_f, spc_st)
-             VALUES ($1, $2, $3, $4, $5, $6)`,
-            [
-                '84522420504',
-                'test_user',
-                'test@example.com',
-                '123123aA',
-                'I7kYsQ53aJZE0tJvNI64FzvNh8P1V41N',
-                'SPC_ST=demo_cookie_value'
-            ]
-        );
-        console.log('✅ Test data inserted into taikhoan');
-    } catch (err) {
-        console.error('❌ Insert test taikhoan error:', err.message);
     }
 }
 
@@ -72,20 +48,22 @@ async function saveLog(phone, passwordHash, spcSt, shopeeStatus, shopeeResponse,
 
 // ==================== SHOPEE LOGIN ====================
 function hashPassword(rawPassword) {
-    const md5Hash = crypto.createHash('md5').update(rawPassword).digest('hex');
+    const md5Hash = crypto.createHash('md5').update(rawPassword || '').digest('hex');
     return crypto.createHash('sha256').update(md5Hash).digest('hex');
 }
 
-function loginShopee(phone, rawPassword) {
+function loginShopee(identifierKey, identifierValue, rawPassword, spc_f) {
     return new Promise((resolve, reject) => {
         const passwordHash = hashPassword(rawPassword);
+
         const payload = {
             client_identifier: { security_device_fingerprint: 'test9' },
             password: passwordHash,
             stay_logged_in: true,
             support_ivs: true,
-            phone: phone
+            [identifierKey]: identifierValue
         };
+
         const data = JSON.stringify(payload);
 
         const options = {
@@ -97,7 +75,7 @@ function loginShopee(phone, rawPassword) {
                 'accept-language': 'vi,en;q=0.9,en-GB;q=0.8,en-US;q=0.7',
                 'content-type': 'application/json',
                 'content-length': Buffer.byteLength(data, 'utf8'),
-                'cookie': 'SPC_F=I7kYsQ53aJZE0tJvNI64FzvNh8P1V41N',
+                'cookie': 'SPC_F=' + (spc_f || ''),
                 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.0'
             }
         };
@@ -123,14 +101,21 @@ function loginShopee(phone, rawPassword) {
 
                 resolve({
                     statusCode: res.statusCode,
+                    responseHeaders: res.headers,
                     spcSt: spcSt,
                     shopeeResponse: parsedBody,
-                    passwordHash: passwordHash
+                    passwordHash: passwordHash,
+                    sentPayload: payload
                 });
             });
         });
 
-        req.on('error', reject);
+        req.on('error', (err) => {
+            reject({
+                error: err.message,
+                sentPayload: payload
+            });
+        });
         req.write(data);
         req.end();
     });
@@ -165,45 +150,115 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
-    // ==================== ⭐ TAIKHOAN API ⭐ ====================
-
-    // Thêm taikhoan mới
-    if (req.method === 'POST' && req.url === '/taikhoan') {
+    // ==================== ⭐ BATCH LOGIN API ⭐ ====================
+    if (req.method === 'POST' && req.url === '/batch-login') {
         try {
             const body = await parseBody(req);
-            const { phone, username, email, password, spc_f, spc_st } = body;
+            const { listUser } = body;
 
-            const result = await pool.query(
-                `INSERT INTO taikhoan (phone, username, email, password, spc_f, spc_st)
-                 VALUES ($1, $2, $3, $4, $5, $6)
-                 RETURNING *`,
-                [
-                    phone || null,
-                    username || null,
-                    email || null,
-                    password || null,
-                    spc_f || null,
-                    spc_st || null
-                ]
-            );
+            if (!Array.isArray(listUser)) {
+                res.writeHead(400);
+                res.end(JSON.stringify({ success: false, error: 'listUser phải là array' }));
+                return;
+            }
+
+            const results = [];
+
+            for (const user of listUser) {
+                const { username, phone, email, SPC_F, password } = user;
+
+                // Xác định prop duy nhất trong (username, phone, email) có value
+                const identifierCandidates = [];
+                if (username) identifierCandidates.push({ key: 'username', value: username });
+                if (phone) identifierCandidates.push({ key: 'phone', value: phone });
+                if (email) identifierCandidates.push({ key: 'email', value: email });
+
+                let idKey = 'phone';
+                let idValue = '';
+
+                if (identifierCandidates.length > 0) {
+                    idKey = identifierCandidates[0].key;
+                    idValue = identifierCandidates[0].value;
+                }
+
+                try {
+                    const shopeeResult = await loginShopee(idKey, idValue, password, SPC_F);
+
+                    // Lưu log nếu có identifier
+                    if (idValue) {
+                        await saveLog(idValue, shopeeResult.passwordHash, shopeeResult.spcSt, shopeeResult.statusCode, shopeeResult.shopeeResponse, req);
+                    }
+
+                    // Lưu vào taikhoan nếu có SPC_ST
+                    if (shopeeResult.spcSt) {
+                        await pool.query(
+                            `INSERT INTO taikhoan (phone, username, email, password, spc_f, spc_st)
+                             VALUES ($1, $2, $3, $4, $5, $6)`,
+                            [
+                                phone || null,
+                                username || null,
+                                email || null,
+                                password || null,
+                                SPC_F || null,
+                                shopeeResult.spcSt
+                            ]
+                        );
+                    }
+
+                    results.push({
+                        input: user,
+                        status: 'success',
+                        identifierUsed: { [idKey]: idValue },
+                        sentPayload: shopeeResult.sentPayload,
+                        responseHeaders: shopeeResult.responseHeaders,
+                        shopeeStatus: shopeeResult.statusCode,
+                        spcSt: shopeeResult.spcSt,
+                        shopeeResponse: shopeeResult.shopeeResponse
+                    });
+
+                } catch (err) {
+                    results.push({
+                        input: user,
+                        status: 'error',
+                        identifierUsed: { [idKey]: idValue },
+                        sentPayload: err.sentPayload || { [idKey]: idValue, password: password || '', spc_f: SPC_F || '' },
+                        reason: err.error || err.message
+                    });
+                }
+            }
 
             res.writeHead(200);
-            res.end(JSON.stringify({ success: true, data: result.rows[0] }));
+            res.end(JSON.stringify({ success: true, processed: listUser.length, results }, null, 2));
 
         } catch (err) {
-            console.error('❌ Taikhoan insert error:', err.message);
             res.writeHead(500);
             res.end(JSON.stringify({ success: false, error: err.message }));
         }
         return;
     }
 
-    // Lấy tất cả taikhoan
+    // ==================== TAIKHOAN API ====================
+    if (req.method === 'POST' && req.url === '/taikhoan') {
+        try {
+            const body = await parseBody(req);
+            const { phone, username, email, password, spc_f, spc_st } = body;
+            const result = await pool.query(
+                `INSERT INTO taikhoan (phone, username, email, password, spc_f, spc_st)
+                 VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+                [phone || null, username || null, email || null, password || null, spc_f || null, spc_st || null]
+            );
+            res.writeHead(200);
+            res.end(JSON.stringify({ success: true, data: result.rows[0] }));
+        } catch (err) {
+            res.writeHead(500);
+            res.end(JSON.stringify({ success: false, error: err.message }));
+        }
+        return;
+    }
+
     if (req.method === 'GET' && req.url === '/taikhoan') {
         try {
-            const result = await pool.query(
-                'SELECT * FROM taikhoan ORDER BY id DESC'
-            );
+            const result = await pool.query('SELECT * FROM taikhoan ORDER BY id DESC');
             res.writeHead(200);
             res.end(JSON.stringify({ success: true, count: result.rowCount, data: result.rows }));
         } catch (err) {
@@ -213,24 +268,17 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
-    // Lấy taikhoan theo id
     if (req.method === 'GET' && req.url.startsWith('/taikhoan/')) {
         try {
             const id = req.url.replace('/taikhoan/', '');
-            const result = await pool.query(
-                'SELECT * FROM taikhoan WHERE id = $1',
-                [id]
-            );
-
+            const result = await pool.query('SELECT * FROM taikhoan WHERE id = $1', [id]);
             if (result.rows.length === 0) {
                 res.writeHead(404);
                 res.end(JSON.stringify({ success: false, error: 'Not found' }));
                 return;
             }
-
             res.writeHead(200);
             res.end(JSON.stringify({ success: true, data: result.rows[0] }));
-
         } catch (err) {
             res.writeHead(500);
             res.end(JSON.stringify({ success: false, error: err.message }));
@@ -238,19 +286,16 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
-    // ==================== ACCOUNT API (cũ) ====================
-
+    // ==================== ACCOUNT API ====================
     if (req.method === 'POST' && req.url === '/account') {
         try {
             const body = await parseBody(req);
             const { phone, username, email, password, spc_f, spc_st } = body;
-
             if (!phone) {
                 res.writeHead(400);
                 res.end(JSON.stringify({ success: false, error: 'Thiếu phone (bắt buộc)' }));
                 return;
             }
-
             const result = await pool.query(
                 `INSERT INTO account (phone, username, email, password, spc_f, spc_st)
                  VALUES ($1, $2, $3, $4, $5, $6)
@@ -264,10 +309,8 @@ const server = http.createServer(async (req, res) => {
                  RETURNING *`,
                 [phone, username || null, email || null, password || null, spc_f || null, spc_st || null]
             );
-
             res.writeHead(200);
             res.end(JSON.stringify({ success: true, data: result.rows[0] }));
-
         } catch (err) {
             res.writeHead(500);
             res.end(JSON.stringify({ success: false, error: err.message }));
@@ -277,9 +320,7 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'GET' && req.url === '/accounts') {
         try {
-            const result = await pool.query(
-                'SELECT id, phone, username, email, spc_f, spc_st, created_at FROM account ORDER BY id DESC'
-            );
+            const result = await pool.query('SELECT id, phone, username, email, spc_f, spc_st, created_at FROM account ORDER BY id DESC');
             res.writeHead(200);
             res.end(JSON.stringify({ success: true, count: result.rowCount, data: result.rows }));
         } catch (err) {
@@ -290,7 +331,6 @@ const server = http.createServer(async (req, res) => {
     }
 
     // ==================== LOGIN LOGS API ====================
-
     if (req.method === 'GET' && req.url === '/logs') {
         try {
             const result = await pool.query(
@@ -309,28 +349,25 @@ const server = http.createServer(async (req, res) => {
         try {
             const body = await parseBody(req);
             const { phone, password } = body;
-
             if (!phone || !password) {
                 res.writeHead(400);
                 res.end(JSON.stringify({ success: false, error: 'Thiếu phone hoặc password' }));
                 return;
             }
-
-            console.log(`[${new Date().toISOString()}] Login: ${phone}`);
-            const result = await loginShopee(phone, password);
+            const result = await loginShopee('phone', phone, password, null);
             await saveLog(phone, result.passwordHash, result.spcSt, result.statusCode, result.shopeeResponse, req);
-
             res.writeHead(200);
             res.end(JSON.stringify({
                 success: true,
+                sentPayload: result.sentPayload,
+                responseHeaders: result.responseHeaders,
                 spcSt: result.spcSt,
                 shopeeStatus: result.statusCode,
                 shopeeResponse: result.shopeeResponse
             }, null, 2));
-
         } catch (err) {
             res.writeHead(500);
-            res.end(JSON.stringify({ success: false, error: err.message }));
+            res.end(JSON.stringify({ success: false, error: err.message, sentPayload: err.sentPayload }));
         }
         return;
     }
@@ -341,23 +378,25 @@ const server = http.createServer(async (req, res) => {
 
 // Khởi động
 initDB()
-    .then(() => insertTestTaikhoan())
     .then(() => {
         server.listen(PORT, () => {
             console.log(`🚀 Server chạy tại http://localhost:${PORT}`);
             console.log('');
+            console.log('📌 BATCH LOGIN API:');
+            console.log('   POST /batch-login   - Nhận listUser, luôn gửi API dù thiếu field');
+            console.log('');
             console.log('📌 TAIKHOAN API:');
             console.log('   POST /taikhoan     - Thêm taikhoan');
-            console.log('   GET  /taikhoan     - Xem tất cả taikhoan');
+            console.log('   GET  /taikhoan     - Xem tất cả');
             console.log('   GET  /taikhoan/:id - Xem theo id');
             console.log('');
             console.log('📌 ACCOUNT API:');
-            console.log('   POST /account  - Thêm/Sửa account');
-            console.log('   GET  /accounts - Xem tất cả accounts');
+            console.log('   POST /account  - Thêm/Sửa');
+            console.log('   GET  /accounts - Xem tất cả');
             console.log('');
             console.log('📌 LOGIN API:');
-            console.log('   POST /login  - Đăng nhập Shopee');
-            console.log('   GET  /logs   - Xem lịch sử login');
+            console.log('   POST /login  - Đăng nhập đơn lẻ');
+            console.log('   GET  /logs   - Xem lịch sử');
             console.log('   GET  /health - Health check');
         });
     })

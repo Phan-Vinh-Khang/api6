@@ -12,7 +12,7 @@ const payload = {
   password: passwordHash,
   stay_logged_in: true,
   support_ivs: true,
-  // username: 'zuup7sktdb'
+  // username: 'zuup7sktdb',
   phone:'84522420504'
 };
 
