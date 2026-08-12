@@ -12,8 +12,8 @@ const payload = {
   password: passwordHash,
   stay_logged_in: true,
   support_ivs: true,
-  // username: 'zuup7sktdb',
-  phone:'84522420504'
+  username: 'vufs2zfqnv',
+  // phone:'84522420504'
 };
 
 const data = JSON.stringify(payload);
@@ -27,7 +27,7 @@ const options = {
     'accept-language': 'vi,en;q=0.9,en-GB;q=0.8,en-US;q=0.7',
     'content-type': 'application/json',
     'content-length': Buffer.byteLength(data, 'utf8'),
-    'cookie': 'SPC_F=I7kYsQ53aJZE0tJvNI64FzvNh8P1V41N',
+    'cookie': 'SPC_F=2AdsPin2u4lvXj3mK7lhY2a7db7YYtJ2',
   }
 };
 
