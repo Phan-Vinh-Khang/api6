@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "start": "node addmgg2.js",
+    "start": "node loginFbody.js",
     "getmap": "node getMap.js",
     "login": "node loginF.js",
     "api2": "node api2.js",
@@ -14,7 +14,7 @@
     "getdelivery2": "node getdelivery2.js"
   },
   "description": "",
-  "main": "addmgg2.js",
+  "main": "loginFbody.js",
   "keywords": [],
   "author": "",
   "license": "ISC",
