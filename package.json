@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "start":"node loginFbody.js",
+    "start": "node addmgg2.js",
     "getmap": "node getMap.js",
     "login": "node loginF.js",
     "api2": "node api2.js",
@@ -14,13 +14,22 @@
     "getdelivery2": "node getdelivery2.js"
   },
   "description": "",
-  "main": "loginFbody.js",
+  "main": "addmgg2.js",
   "keywords": [],
   "author": "",
   "license": "ISC",
   "type": "commonjs",
   "dependencies": {
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
     "pg": "^8.23.0"
   },
-  "devDependencies": {}
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Phan-Vinh-Khang/api6.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Phan-Vinh-Khang/api6/issues"
+  },
+  "homepage": "https://github.com/Phan-Vinh-Khang/api6#readme"
 }
