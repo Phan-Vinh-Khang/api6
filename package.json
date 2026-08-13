@@ -11,7 +11,8 @@
     "getdelivery": "node getdelivery.js",
     "addmgg": "node addmgg.js",
     "login2": "node loginFbody.js",
-    "getdelivery2": "node getdelivery2.js"
+    "getdelivery2": "node getdelivery2.js",
+    "addmggbody":"node addmggbody.js"
   },
   "description": "",
   "main": "loginFbody.js",
