@@ -116,6 +116,18 @@ function isSuccess(response) {
     return false;
 }
 
+// ⭐ Map error code sang description
+function getErrorDescription(errorCode) {
+    const code = Number(errorCode);
+    switch (code) {
+        case 0:  return 'lấy SPC_ST thành công';
+        case 2:  return 'password chưa chính xác';
+        case 9:  return 'Tài khoản đã bị khóa';
+        case 89: return 'Không thể lấy SPC_ST,chờ 24h hoặc sử dụng SPC_F khác';
+        default: return 'lỗi không xác định';
+    }
+}
+
 const server = http.createServer(async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
@@ -180,16 +192,18 @@ const server = http.createServer(async (req, res) => {
                         );
                     }
 
-                    // ⭐ Chỉ return spcSt và error
+                    const errCode = shopeeResult.shopeeResponse?.error ?? null;
                     results.push({
                         spcSt: shopeeResult.spcSt,
-                        error: shopeeResult.shopeeResponse?.error ?? null
+                        error: errCode,
+                        des: getErrorDescription(errCode)
                     });
 
                 } catch (err) {
                     results.push({
                         spcSt: null,
-                        error: err.error || err.message
+                        error: err.error || err.message,
+                        des: getErrorDescription(err.error) || 'lỗi không xác định'
                     });
                 }
             }
@@ -224,18 +238,20 @@ const server = http.createServer(async (req, res) => {
                 );
             }
 
-            // ⭐ Chỉ return spcSt và error
+            const errCode = result.shopeeResponse?.error ?? null;
             res.writeHead(200);
             res.end(JSON.stringify({
                 spcSt: result.spcSt,
-                error: result.shopeeResponse?.error ?? null
+                error: errCode,
+                des: getErrorDescription(errCode)
             }, null, 2));
 
         } catch (err) {
             res.writeHead(500);
             res.end(JSON.stringify({
                 spcSt: null,
-                error: err.error || err.message
+                error: err.error || err.message,
+                des: getErrorDescription(err.error) || 'lỗi không xác định'
             }));
         }
         return;
