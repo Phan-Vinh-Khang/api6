@@ -128,6 +128,7 @@ function getErrorDescription(errorCode) {
         case 2:  return 'Tài khoản không chính xác';
         case 9:  return 'Tài khoản đã bị khóa';
         case 89: return 'Không thể lấy SPC_ST,chờ 24h hoặc sử dụng SPC_F khác';
+        case 89: return 'SPC_F chưa chính xác, sử dụng SPC_F khác';
         default: return 'lỗi không xác định';
     }
 }
