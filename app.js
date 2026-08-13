@@ -2,7 +2,7 @@ const http = require('http');
 const { handleLoginRoutes, initDB, pool } = require('./loginFbody');
 const { handleVoucherRoutes } = require('./addmggbody');
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3003;
 
 const server = http.createServer(async (req, res) => {
     // Global CORS
