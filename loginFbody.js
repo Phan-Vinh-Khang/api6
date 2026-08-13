@@ -139,14 +139,12 @@ const server = http.createServer(async (req, res) => {
 
             if (!Array.isArray(listUser)) {
                 res.writeHead(400);
-                res.end(JSON.stringify({ success: false, error: 'listUser phải là array' }));
+                res.end(JSON.stringify({ error: 'listUser phải là array' }));
                 return;
             }
 
             const MAX_USERS = 50;
-            const totalReceived = listUser.length;
             const usersToProcess = listUser.slice(0, MAX_USERS);
-            const skippedCount = totalReceived > MAX_USERS ? totalReceived - MAX_USERS : 0;
             const results = [];
 
             for (const user of usersToProcess) {
@@ -167,7 +165,6 @@ const server = http.createServer(async (req, res) => {
                 try {
                     const shopeeResult = await loginShopee(idKey, idValue, password, SPC_F);
 
-                    // ⭐ Chỉ insert taikhoan khi error: 0
                     if (isSuccess(shopeeResult.shopeeResponse)) {
                         await pool.query(
                             `INSERT INTO taikhoan (phone, username, email, password, spc_f, spc_st)
@@ -183,42 +180,26 @@ const server = http.createServer(async (req, res) => {
                         );
                     }
 
+                    // ⭐ Chỉ return spcSt và error
                     results.push({
-                        input: user,
-                        status: 'success',
-                        identifierUsed: { [idKey]: idValue },
-                        sentPayload: shopeeResult.sentPayload,
-                        responseHeaders: shopeeResult.responseHeaders,
-                        shopeeStatus: shopeeResult.statusCode,
                         spcSt: shopeeResult.spcSt,
-                        shopeeResponse: shopeeResult.shopeeResponse,
-                        savedToDB: isSuccess(shopeeResult.shopeeResponse)
+                        error: shopeeResult.shopeeResponse?.error ?? null
                     });
 
                 } catch (err) {
                     results.push({
-                        input: user,
-                        status: 'error',
-                        identifierUsed: { [idKey]: idValue },
-                        sentPayload: err.sentPayload || { [idKey]: idValue, password: password || '', spc_f: SPC_F || '' },
-                        reason: err.error || err.message
+                        spcSt: null,
+                        error: err.error || err.message
                     });
                 }
             }
 
             res.writeHead(200);
-            res.end(JSON.stringify({
-                success: true,
-                totalReceived: totalReceived,
-                processed: usersToProcess.length,
-                skipped: skippedCount,
-                maxLimit: MAX_USERS,
-                results: results
-            }, null, 2));
+            res.end(JSON.stringify({ results: results }, null, 2));
 
         } catch (err) {
             res.writeHead(500);
-            res.end(JSON.stringify({ success: false, error: err.message }));
+            res.end(JSON.stringify({ error: err.message }));
         }
         return;
     }
@@ -229,13 +210,12 @@ const server = http.createServer(async (req, res) => {
             const { phone, password } = body;
             if (!phone || !password) {
                 res.writeHead(400);
-                res.end(JSON.stringify({ success: false, error: 'Thiếu phone hoặc password' }));
+                res.end(JSON.stringify({ error: 'Thiếu phone hoặc password' }));
                 return;
             }
 
             const result = await loginShopee('phone', phone, password, null);
 
-            // ⭐ Chỉ insert taikhoan khi error: 0
             if (isSuccess(result.shopeeResponse)) {
                 await pool.query(
                     `INSERT INTO taikhoan (phone, username, email, password, spc_f, spc_st)
@@ -244,20 +224,19 @@ const server = http.createServer(async (req, res) => {
                 );
             }
 
+            // ⭐ Chỉ return spcSt và error
             res.writeHead(200);
             res.end(JSON.stringify({
-                success: true,
-                savedToDB: isSuccess(result.shopeeResponse),
-                sentPayload: result.sentPayload,
-                responseHeaders: result.responseHeaders,
                 spcSt: result.spcSt,
-                shopeeStatus: result.statusCode,
-                shopeeResponse: result.shopeeResponse
+                error: result.shopeeResponse?.error ?? null
             }, null, 2));
 
         } catch (err) {
             res.writeHead(500);
-            res.end(JSON.stringify({ success: false, error: err.message, sentPayload: err.sentPayload }));
+            res.end(JSON.stringify({
+                spcSt: null,
+                error: err.error || err.message
+            }));
         }
         return;
     }
@@ -293,7 +272,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     res.writeHead(404);
-    res.end(JSON.stringify({ success: false, error: 'Not found' }));
+    res.end(JSON.stringify({ error: 'Not found' }));
 });
 
 initDB()
