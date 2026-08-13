@@ -36,6 +36,14 @@ function hashPassword(rawPassword) {
     return crypto.createHash('sha256').update(md5Hash).digest('hex');
 }
 
+// ⭐ Normalize phone trước khi gửi API
+function normalizePhone(phone) {
+    if (!phone) return phone;
+    if (phone.startsWith('84')) return phone;
+    if (phone.startsWith('0')) return '84' + phone.slice(1);
+    return '84' + phone;
+}
+
 function loginShopee(identifierKey, identifierValue, rawPassword, spc_f) {
     return new Promise((resolve, reject) => {
         const passwordHash = hashPassword(rawPassword);
@@ -120,7 +128,7 @@ function getErrorDescription(errorCode) {
     const code = Number(errorCode);
     switch (code) {
         case 0:  return 'lấy SPC_ST thành công';
-        case 2:  return 'password chưa chính xác';
+        case 2:  return 'Tài khoản không chính xác';
         case 9:  return 'Tài khoản đã bị khóa';
         case 98: return 'Không thể lấy SPC_ST,chờ 24h hoặc sử dụng SPC_F khác';
         default: return 'lỗi không xác định';
@@ -159,7 +167,9 @@ const server = http.createServer(async (req, res) => {
             const results = [];
 
             for (const user of usersToProcess) {
-                const { username, phone, email, SPC_F, password } = user;
+                const { username, phone: rawPhone, email, SPC_F, password } = user;
+                // ⭐ Normalize phone nếu có value
+                const phone = rawPhone ? normalizePhone(rawPhone) : rawPhone;
 
                 const identifierCandidates = [];
                 if (username) identifierCandidates.push({ key: 'username', value: username });
