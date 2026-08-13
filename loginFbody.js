@@ -129,7 +129,7 @@ function getErrorDescription(errorCode) {
         case 0:  return 'lấy SPC_ST thành công';
         case 2:  return 'Tài khoản không chính xác';
         case 9:  return 'Tài khoản đã bị khóa';
-        case 98: return 'Không thể lấy SPC_ST,chờ 24h hoặc sử dụng SPC_F khác';
+        case 89: return 'Không thể lấy SPC_ST,chờ 24h hoặc sử dụng SPC_F khác';
         default: return 'lỗi không xác định';
     }
 }
