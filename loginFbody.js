@@ -116,14 +116,13 @@ function isSuccess(response) {
     return false;
 }
 
-// ⭐ Map error code sang description
 function getErrorDescription(errorCode) {
     const code = Number(errorCode);
     switch (code) {
         case 0:  return 'lấy SPC_ST thành công';
         case 2:  return 'password chưa chính xác';
         case 9:  return 'Tài khoản đã bị khóa';
-        case 89: return 'Không thể lấy SPC_ST,chờ 24h hoặc sử dụng SPC_F khác';
+        case 98: return 'Không thể lấy SPC_ST,chờ 24h hoặc sử dụng SPC_F khác';
         default: return 'lỗi không xác định';
     }
 }
@@ -214,45 +213,6 @@ const server = http.createServer(async (req, res) => {
         } catch (err) {
             res.writeHead(500);
             res.end(JSON.stringify({ error: err.message }));
-        }
-        return;
-    }
-
-    if (req.method === 'POST' && req.url === '/login') {
-        try {
-            const body = await parseBody(req);
-            const { phone, password } = body;
-            if (!phone || !password) {
-                res.writeHead(400);
-                res.end(JSON.stringify({ error: 'Thiếu phone hoặc password' }));
-                return;
-            }
-
-            const result = await loginShopee('phone', phone, password, null);
-
-            if (isSuccess(result.shopeeResponse)) {
-                await pool.query(
-                    `INSERT INTO taikhoan (phone, username, email, password, spc_f, spc_st)
-                     VALUES ($1, $2, $3, $4, $5, $6)`,
-                    [phone, null, null, password, null, result.spcSt || null]
-                );
-            }
-
-            const errCode = result.shopeeResponse?.error ?? null;
-            res.writeHead(200);
-            res.end(JSON.stringify({
-                spcSt: result.spcSt,
-                error: errCode,
-                des: getErrorDescription(errCode)
-            }, null, 2));
-
-        } catch (err) {
-            res.writeHead(500);
-            res.end(JSON.stringify({
-                spcSt: null,
-                error: err.error || err.message,
-                des: getErrorDescription(err.error) || 'lỗi không xác định'
-            }));
         }
         return;
     }
