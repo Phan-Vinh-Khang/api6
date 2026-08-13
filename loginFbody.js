@@ -36,7 +36,6 @@ function hashPassword(rawPassword) {
     return crypto.createHash('sha256').update(md5Hash).digest('hex');
 }
 
-// ⭐ Normalize phone trước khi gửi API
 function normalizePhone(phone) {
     if (!phone) return phone;
     if (phone.startsWith('84')) return phone;
@@ -168,7 +167,6 @@ const server = http.createServer(async (req, res) => {
 
             for (const user of usersToProcess) {
                 const { username, phone: rawPhone, email, SPC_F, password } = user;
-                // ⭐ Normalize phone nếu có value
                 const phone = rawPhone ? normalizePhone(rawPhone) : rawPhone;
 
                 const identifierCandidates = [];
@@ -202,18 +200,24 @@ const server = http.createServer(async (req, res) => {
                     }
 
                     const errCode = shopeeResult.shopeeResponse?.error ?? null;
-                    results.push({
+
+                    // ⭐ Thêm identifier vào response
+                    const resultItem = {
                         spcSt: shopeeResult.spcSt,
                         error: errCode,
                         des: getErrorDescription(errCode)
-                    });
+                    };
+                    resultItem[idKey] = idValue;
+                    results.push(resultItem);
 
                 } catch (err) {
-                    results.push({
+                    const errorItem = {
                         spcSt: null,
                         error: err.error || err.message,
                         des: getErrorDescription(err.error) || 'lỗi không xác định'
-                    });
+                    };
+                    errorItem[idKey] = idValue;
+                    results.push(errorItem);
                 }
             }
 
