@@ -73,8 +73,8 @@ function parseBody(req) {
 }
 
 async function handleVoucherRoutes(req, res) {
-    if (req.method === 'POST' && req.url === '/addmgg') {
-        try {
+    try {
+        if (req.method === 'POST' && req.url === '/addmgg') {
             const body = await parseBody(req);
             const { listUser, listVoucher } = body;
 
@@ -141,8 +141,11 @@ async function handleVoucherRoutes(req, res) {
                 validCount: results.filter(r => r.status === 'valid').length,
                 results: results
             }, null, 2));
-
-        } catch (err) {
+            return true;
+        }
+    } catch (err) {
+        console.error('Voucher route error:', err);
+        if (!res.writableEnded) {
             res.writeHead(500);
             res.end(JSON.stringify({ success: false, error: err.message }));
         }

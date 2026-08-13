@@ -133,8 +133,8 @@ function getErrorDescription(errorCode) {
 }
 
 async function handleLoginRoutes(req, res) {
-    if (req.method === 'POST' && req.url === '/batch-login') {
-        try {
+    try {
+        if (req.method === 'POST' && req.url === '/batch-login') {
             const body = await parseBody(req);
             const { listUser } = body;
 
@@ -205,28 +205,17 @@ async function handleLoginRoutes(req, res) {
 
             res.writeHead(200);
             res.end(JSON.stringify({ results: results }, null, 2));
-
-        } catch (err) {
-            res.writeHead(500);
-            res.end(JSON.stringify({ error: err.message }));
+            return true;
         }
-        return true;
-    }
 
-    if (req.method === 'GET' && req.url === '/taikhoan') {
-        try {
+        if (req.method === 'GET' && req.url === '/taikhoan') {
             const result = await pool.query('SELECT * FROM taikhoan ORDER BY id DESC');
             res.writeHead(200);
             res.end(JSON.stringify({ success: true, count: result.rowCount, data: result.rows }));
-        } catch (err) {
-            res.writeHead(500);
-            res.end(JSON.stringify({ success: false, error: err.message }));
+            return true;
         }
-        return true;
-    }
 
-    if (req.method === 'GET' && req.url.startsWith('/taikhoan/')) {
-        try {
+        if (req.method === 'GET' && req.url.startsWith('/taikhoan/')) {
             const id = req.url.replace('/taikhoan/', '');
             const result = await pool.query('SELECT * FROM taikhoan WHERE id = $1', [id]);
             if (result.rows.length === 0) {
@@ -236,9 +225,13 @@ async function handleLoginRoutes(req, res) {
             }
             res.writeHead(200);
             res.end(JSON.stringify({ success: true, data: result.rows[0] }));
-        } catch (err) {
+            return true;
+        }
+    } catch (err) {
+        console.error('Login route error:', err);
+        if (!res.writableEnded) {
             res.writeHead(500);
-            res.end(JSON.stringify({ success: false, error: err.message }));
+            res.end(JSON.stringify({ error: err.message }));
         }
         return true;
     }
