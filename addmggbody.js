@@ -118,60 +118,77 @@ async function handleVoucherRoutes(req, res) {
 
             // --- Set để đảm bảo 1 cookie chỉ insert 1 lần ---
             const insertedCookies = new Set();
+            // --- Map lưu lỗi đầu tiên của cookie để skip các voucher sau ---
+            const cookieErrorCache = new Map();
 
             for (let i = 0; i < COOKIES.length; i++) {
                 for (let j = 0; j < VOUCHER_CODES.length; j++) {
                     requestCount++;
-                    const result = await requestWithCookie(COOKIES[i], VOUCHER_CODES[j]);
 
-                    if (result.success && result.data?.data) {
-                        const invalidCode = result.data.data.invalid_message_code;
-
-                        // --- INSERT DB: chỉ chạy 1 lần cho mỗi cookie ---
-                        if (!insertedCookies.has(COOKIES[i])) {
-                            try {
-                                const spcSt = extractSpcSt(COOKIES[i]);
-                                const spcF  = extractSpcF(COOKIES[i]);
-                                if (spcSt) {
-                                    await pool.query(
-                                        `INSERT INTO taikhoan (phone, username, email, password, spc_f, spc_st)
-                                         VALUES ($1, $2, $3, $4, $5, $6)
-                                         ON CONFLICT (id) DO NOTHING`,
-                                        [null, null, null, null, spcF || null, spcSt]
-                                    );
-                                    insertedCookies.add(COOKIES[i]);
-                                }
-                            } catch (dbErr) {
-                                console.error('DB insert error:', dbErr.message);
-                            }
-                        }
-                        // --- END INSERT DB ---
-
-                        if (invalidCode === 0 || invalidCode === 1) {
-                            results.push({
-                                accountIndex: i + 1,
-                                voucherCode: VOUCHER_CODES[j],
-                                invalid_message_code: invalidCode,
-                                cookie: COOKIES[i],
-                                status: 'valid'
-                            });
-                        } else {
-                            results.push({
-                                accountIndex: i + 1,
-                                voucherCode: VOUCHER_CODES[j],
-                                invalid_message_code: invalidCode,
-                                status: 'invalid'
-                            });
-                        }
-                    } else {
-                        // --- SỬA: thêm cookie vào response khi data không có value ---
+                    // Nếu cookie này đã lỗi ở voucher trước -> skip API, dùng cache
+                    if (cookieErrorCache.has(COOKIES[i])) {
+                        const cached = cookieErrorCache.get(COOKIES[i]);
                         results.push({
                             accountIndex: i + 1,
                             voucherCode: VOUCHER_CODES[j],
                             status: 'error',
-                            error: result.error || 'unknown',
+                            error: cached.error,
                             cookie: COOKIES[i]
                         });
+                    } else {
+                        const result = await requestWithCookie(COOKIES[i], VOUCHER_CODES[j]);
+
+                        if (result.success && result.data?.data) {
+                            const invalidCode = result.data.data.invalid_message_code;
+
+                            // --- INSERT DB: chỉ chạy 1 lần cho mỗi cookie ---
+                            if (!insertedCookies.has(COOKIES[i])) {
+                                try {
+                                    const spcSt = extractSpcSt(COOKIES[i]);
+                                    const spcF  = extractSpcF(COOKIES[i]);
+                                    if (spcSt) {
+                                        await pool.query(
+                                            `INSERT INTO taikhoan (phone, username, email, password, spc_f, spc_st)
+                                             VALUES ($1, $2, $3, $4, $5, $6)
+                                             ON CONFLICT (id) DO NOTHING`,
+                                            [null, null, null, null, spcF || null, spcSt]
+                                        );
+                                        insertedCookies.add(COOKIES[i]);
+                                    }
+                                } catch (dbErr) {
+                                    console.error('DB insert error:', dbErr.message);
+                                }
+                            }
+                            // --- END INSERT DB ---
+
+                            if (invalidCode === 0 || invalidCode === 1) {
+                                results.push({
+                                    accountIndex: i + 1,
+                                    voucherCode: VOUCHER_CODES[j],
+                                    invalid_message_code: invalidCode,
+                                    cookie: COOKIES[i],
+                                    status: 'valid'
+                                });
+                            } else {
+                                results.push({
+                                    accountIndex: i + 1,
+                                    voucherCode: VOUCHER_CODES[j],
+                                    invalid_message_code: invalidCode,
+                                    status: 'invalid'
+                                });
+                            }
+                        } else {
+                            // Lỗi đầu tiên -> cache lại để skip các voucher sau
+                            const errMsg = result.error || 'unknown';
+                            cookieErrorCache.set(COOKIES[i], { error: errMsg });
+                            results.push({
+                                accountIndex: i + 1,
+                                voucherCode: VOUCHER_CODES[j],
+                                status: 'error',
+                                error: errMsg,
+                                cookie: COOKIES[i]
+                            });
+                        }
                     }
 
                     if (requestCount < totalRequests) {
