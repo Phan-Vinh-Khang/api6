@@ -164,11 +164,13 @@ async function handleVoucherRoutes(req, res) {
                             });
                         }
                     } else {
+                        // --- SỬA: thêm cookie vào response khi data không có value ---
                         results.push({
                             accountIndex: i + 1,
                             voucherCode: VOUCHER_CODES[j],
                             status: 'error',
-                            error: result.error || 'unknown'
+                            error: result.error || 'unknown',
+                            cookie: COOKIES[i]
                         });
                     }
 
