@@ -4,6 +4,7 @@ const { handleVoucherRoutes } = require('./addmggbody');
 const { handleGetAccountRoutes } = require('./getAccount');
 const { handleGetOrderRoutes } = require('./getOrder');
 const { handleTramavandonRoutes } = require('./tramavandon');
+const { handleGHNRoutes } = require('./ghn');
 
 const PORT = process.env.PORT || 3003;
 
@@ -38,6 +39,9 @@ const server = http.createServer(async (req, res) => {
 
         const handledByTramavandon = await handleTramavandonRoutes(req, res);
         if (handledByTramavandon) return;
+
+        const handledByGHN = await handleGHNRoutes(req, res);
+        if (handledByGHN) return;
 
         const handledByVoucher = await handleVoucherRoutes(req, res);
         if (handledByVoucher) return;
