@@ -1,7 +1,18 @@
 const https = require('https');
 const zlib = require('zlib');
 
-function forwardToGHN(headers) {
+function parseBody(req) {
+    return new Promise((resolve, reject) => {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', () => {
+            try { resolve(body ? JSON.parse(body) : {}); }
+            catch { reject(new Error('Invalid JSON body')); }
+        });
+    });
+}
+
+function forwardToGHN(headers, postData) {
     return new Promise((resolve) => {
         // Loại bỏ các header không nên forward
         const filteredHeaders = { ...headers };
@@ -9,16 +20,15 @@ function forwardToGHN(headers) {
         delete filteredHeaders.connection;
         delete filteredHeaders['content-length'];
         delete filteredHeaders['content-encoding'];
-        
-        // Đảm bảo có accept
-        if (!filteredHeaders.accept) {
-            filteredHeaders.accept = 'application/json';
-        }
+
+        // Đảm bảo content-type và content-length đúng
+        filteredHeaders['content-type'] = 'application/json';
+        filteredHeaders['content-length'] = Buffer.byteLength(postData);
 
         const options = {
             hostname: 'fe-online-gateway.ghn.vn',
             path: '/order-tracking/public-api/client/tracking-logs',
-            method: 'GET',
+            method: 'POST',
             headers: filteredHeaders
         };
 
@@ -56,14 +66,17 @@ function forwardToGHN(headers) {
             resolve({ success: false, error: err.message });
         });
 
+        req.write(postData);
         req.end();
     });
 }
 
 async function handleGHNRoutes(req, res) {
     try {
-        if (req.method === 'GET' && req.url === '/ghn') {
-            const result = await forwardToGHN(req.headers);
+        if (req.method === 'POST' && req.url === '/ghn') {
+            const body = await parseBody(req);
+            const postData = JSON.stringify(body);
+            const result = await forwardToGHN(req.headers, postData);
 
             if (!result.success) {
                 res.writeHead(502);
