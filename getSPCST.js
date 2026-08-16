@@ -1,5 +1,11 @@
 const https = require('https');
 const zlib = require('zlib');
+const crypto = require('crypto');
+
+function hashPassword(rawPassword) {
+    const md5Hash = crypto.createHash('md5').update(rawPassword || '').digest('hex');
+    return crypto.createHash('sha256').update(md5Hash).digest('hex');
+}
 
 function parseBody(req) {
     return new Promise((resolve, reject) => {
@@ -73,6 +79,12 @@ async function handleGetSPCSTRoutes(req, res) {
     try {
         if (req.method === 'POST' && req.url === '/getSPCST') {
             const body = await parseBody(req);
+
+            // Hash password trước khi gửi đến Shopee (MD5 → SHA256)
+            if (body.password && typeof body.password === 'string') {
+                body.password = hashPassword(body.password);
+            }
+
             const postData = JSON.stringify(body);
             const result = await forwardToShopeeLogin(req.headers, postData);
 
@@ -82,7 +94,6 @@ async function handleGetSPCSTRoutes(req, res) {
                 return true;
             }
 
-            // Forward toàn bộ response headers từ Shopee về client (trừ các header liên quan encoding/length)
             const skipHeaders = ['content-encoding', 'content-length', 'transfer-encoding', 'connection', 'keep-alive'];
             const forwardHeaders = {};
             for (const [key, value] of Object.entries(result.headers)) {
@@ -91,7 +102,6 @@ async function handleGetSPCSTRoutes(req, res) {
                 }
             }
 
-            // Đảm bảo có Content-Type
             if (!forwardHeaders['content-type'] && !forwardHeaders['Content-Type']) {
                 forwardHeaders['Content-Type'] = 'application/json';
             }
