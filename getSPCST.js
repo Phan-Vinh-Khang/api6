@@ -69,9 +69,9 @@ function forwardToShopeeLogin(headers, postData) {
     });
 }
 
-async function handleGetSPC_STRoutes(req, res) {
+async function handleGetSPCSTRoutes(req, res) {
     try {
-        if (req.method === 'POST' && req.url === '/getSPC_ST') {
+        if (req.method === 'POST' && req.url === '/getSPCST') {
             const body = await parseBody(req);
             const postData = JSON.stringify(body);
             const result = await forwardToShopeeLogin(req.headers, postData);
@@ -89,7 +89,7 @@ async function handleGetSPC_STRoutes(req, res) {
             return true;
         }
     } catch (err) {
-        console.error('getSPC_ST route error:', err);
+        console.error('getSPCST route error:', err);
         if (!res.writableEnded) {
             res.writeHead(500);
             res.end(JSON.stringify({ success: false, error: err.message }));
@@ -100,4 +100,4 @@ async function handleGetSPC_STRoutes(req, res) {
     return false;
 }
 
-module.exports = { handleGetSPC_STRoutes };
+module.exports = { handleGetSPCSTRoutes };

@@ -5,7 +5,7 @@ const { handleGetAccountRoutes } = require('./getAccount');
 const { handleGetOrderRoutes } = require('./getOrder');
 const { handleTramavandonRoutes } = require('./tramavandon');
 const { handleGHNRoutes } = require('./ghn');
-const { handleGetSPC_STRoutes } = require('./getSPC_ST');
+const { handleGetSPCSTRoutes } = require('./getSPCST');
 
 const PORT = process.env.PORT || 3003;
 
@@ -43,8 +43,8 @@ const server = http.createServer(async (req, res) => {
         const handledByGHN = await handleGHNRoutes(req, res);
         if (handledByGHN) return;
 
-        const handledByGetSPC_ST = await handleGetSPC_STRoutes(req, res);
-        if (handledByGetSPC_ST) return;
+        const handledByGetSPCST = await handleGetSPCSTRoutes(req, res);
+        if (handledByGetSPCST) return;
 
         const handledByVoucher = await handleVoucherRoutes(req, res);
         if (handledByVoucher) return;
