@@ -3,6 +3,7 @@ const { handleLoginRoutes, initDB, pool } = require('./loginFbody');
 const { handleVoucherRoutes } = require('./addmggbody');
 const { handleGetAccountRoutes } = require('./getAccount');
 const { handleGetOrderRoutes } = require('./getOrder');
+const { handleTramavandonRoutes } = require('./tramavandon');
 
 const PORT = process.env.PORT || 3003;
 
@@ -34,6 +35,9 @@ const server = http.createServer(async (req, res) => {
 
         const handledByGetOrder = await handleGetOrderRoutes(req, res);
         if (handledByGetOrder) return;
+
+        const handledByTramavandon = await handleTramavandonRoutes(req, res);
+        if (handledByTramavandon) return;
 
         const handledByVoucher = await handleVoucherRoutes(req, res);
         if (handledByVoucher) return;
