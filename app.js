@@ -1,6 +1,7 @@
 const http = require('http');
 const { handleLoginRoutes, initDB, pool } = require('./loginFbody');
 const { handleVoucherRoutes } = require('./addmggbody');
+const { handleGetAccountRoutes } = require('./getAccount');
 
 const PORT = process.env.PORT || 3003;
 
@@ -26,6 +27,9 @@ const server = http.createServer(async (req, res) => {
     try {
         const handledByLogin = await handleLoginRoutes(req, res);
         if (handledByLogin) return;
+
+        const handledByGetAccount = await handleGetAccountRoutes(req, res);
+        if (handledByGetAccount) return;
 
         const handledByVoucher = await handleVoucherRoutes(req, res);
         if (handledByVoucher) return;
