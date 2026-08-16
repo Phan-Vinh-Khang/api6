@@ -1,7 +1,18 @@
 const https = require('https');
 const zlib = require('zlib');
 
-function forwardToTramavandon(headers) {
+function parseBody(req) {
+    return new Promise((resolve, reject) => {
+        let body = '';
+        req.on('data', chunk => body += chunk);
+        req.on('end', () => {
+            try { resolve(body ? JSON.parse(body) : {}); }
+            catch { reject(new Error('Invalid JSON body')); }
+        });
+    });
+}
+
+function forwardToTramavandon(headers, postData) {
     return new Promise((resolve) => {
         // Loại bỏ các header không nên forward
         const filteredHeaders = { ...headers };
@@ -10,15 +21,14 @@ function forwardToTramavandon(headers) {
         delete filteredHeaders['content-length'];
         delete filteredHeaders['content-encoding'];
         
-        // Đảm bảo có accept
-        if (!filteredHeaders.accept) {
-            filteredHeaders.accept = 'application/json';
-        }
+        // Đảm bảo có content-type và content-length đúng
+        filteredHeaders['content-type'] = 'application/json';
+        filteredHeaders['content-length'] = Buffer.byteLength(postData);
 
         const options = {
             hostname: 'tramavandon.com',
             path: '/api/spx.php',
-            method: 'GET',
+            method: 'POST',
             headers: filteredHeaders
         };
 
@@ -56,14 +66,17 @@ function forwardToTramavandon(headers) {
             resolve({ success: false, error: err.message });
         });
 
+        req.write(postData);
         req.end();
     });
 }
 
 async function handleTramavandonRoutes(req, res) {
     try {
-        if (req.method === 'GET' && req.url === '/tramavandon') {
-            const result = await forwardToTramavandon(req.headers);
+        if (req.method === 'POST' && req.url === '/tramavandon') {
+            const body = await parseBody(req);
+            const postData = JSON.stringify(body);
+            const result = await forwardToTramavandon(req.headers, postData);
 
             if (!result.success) {
                 res.writeHead(502);
