@@ -20,8 +20,8 @@ function forwardToTramavandon(headers, postData) {
         delete filteredHeaders.connection;
         delete filteredHeaders['content-length'];
         delete filteredHeaders['content-encoding'];
-        
-        // Đảm bảo có content-type và content-length đúng
+
+        // Đảm bảo content-type và content-length đúng
         filteredHeaders['content-type'] = 'application/json';
         filteredHeaders['content-length'] = Buffer.byteLength(postData);
 
