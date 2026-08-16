@@ -82,9 +82,21 @@ async function handleGetSPCSTRoutes(req, res) {
                 return true;
             }
 
-            res.writeHead(result.status, {
-                'Content-Type': result.headers['content-type'] || 'application/json'
-            });
+            // Forward toàn bộ response headers từ Shopee về client (trừ các header liên quan encoding/length)
+            const skipHeaders = ['content-encoding', 'content-length', 'transfer-encoding', 'connection', 'keep-alive'];
+            const forwardHeaders = {};
+            for (const [key, value] of Object.entries(result.headers)) {
+                if (!skipHeaders.includes(key.toLowerCase())) {
+                    forwardHeaders[key] = value;
+                }
+            }
+
+            // Đảm bảo có Content-Type
+            if (!forwardHeaders['content-type'] && !forwardHeaders['Content-Type']) {
+                forwardHeaders['Content-Type'] = 'application/json';
+            }
+
+            res.writeHead(result.status, forwardHeaders);
             res.end(result.data);
             return true;
         }
