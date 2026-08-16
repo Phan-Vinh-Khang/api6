@@ -5,11 +5,11 @@ const { handleGetAccountRoutes } = require('./getAccount');
 const { handleGetOrderRoutes } = require('./getOrder');
 const { handleTramavandonRoutes } = require('./tramavandon');
 const { handleGHNRoutes } = require('./ghn');
+const { handleGetSPC_STRoutes } = require('./getSPC_ST');
 
 const PORT = process.env.PORT || 3003;
 
 const server = http.createServer(async (req, res) => {
-    // Global CORS
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'POST, GET, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
@@ -43,6 +43,9 @@ const server = http.createServer(async (req, res) => {
         const handledByGHN = await handleGHNRoutes(req, res);
         if (handledByGHN) return;
 
+        const handledByGetSPC_ST = await handleGetSPC_STRoutes(req, res);
+        if (handledByGetSPC_ST) return;
+
         const handledByVoucher = await handleVoucherRoutes(req, res);
         if (handledByVoucher) return;
     } catch (err) {
@@ -74,7 +77,6 @@ process.on('SIGTERM', () => {
     server.close(() => process.exit(0));
 });
 
-// Bắt lỗi không xử lý được để server không crash đột ngột
 process.on('uncaughtException', (err) => {
     console.error('Uncaught Exception:', err);
 });
