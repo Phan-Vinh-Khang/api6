@@ -169,18 +169,26 @@ async function handleLoginRoutes(req, res) {
                     const shopeeResult = await loginShopee(idKey, idValue, password, SPC_F);
 
                     if (isSuccess(shopeeResult.shopeeResponse)) {
-                        await pool.query(
-                            `INSERT INTO taikhoan (phone, username, email, password, spc_f, spc_st)
-                             VALUES ($1, $2, $3, $4, $5, $6)`,
-                            [
-                                phone || null,
-                                username || null,
-                                email || null,
-                                password || null,
-                                SPC_F || null,
-                                shopeeResult.spcSt || null
-                            ]
+                        // Kiểm tra nếu spc_st hoặc spc_f đã tồn tại thì không insert
+                        const checkRes = await pool.query(
+                            `SELECT id FROM taikhoan WHERE spc_st = $1 OR spc_f = $2 LIMIT 1`,
+                            [shopeeResult.spcSt || null, SPC_F || null]
                         );
+
+                        if (checkRes.rows.length === 0) {
+                            await pool.query(
+                                `INSERT INTO taikhoan (phone, username, email, password, spc_f, spc_st)
+                                 VALUES ($1, $2, $3, $4, $5, $6)`,
+                                [
+                                    phone || null,
+                                    username || null,
+                                    email || null,
+                                    password || null,
+                                    SPC_F || null,
+                                    shopeeResult.spcSt || null
+                                ]
+                            );
+                        }
                     }
 
                     const errCode = shopeeResult.shopeeResponse?.error ?? null;
