@@ -119,7 +119,7 @@ function parseBody(req) {
 
 async function handleVoucherRoutes(req, res) {
     try {
-        if (req.method === 'POST' && req.url === '/addmgg') {
+        if (req.method === 'POST' && req.url.startsWith('/addmgg')) {
             const body = await parseBody(req);
             const { listUser, listVoucher } = body;
 
@@ -133,6 +133,11 @@ async function handleVoucherRoutes(req, res) {
                 res.end(JSON.stringify({ error: 'listVoucher phải là array' }));
                 return true;
             }
+
+            // Kiểm tra query param ?admin=true
+            const urlParts = req.url.split('?');
+            const queryParams = new URLSearchParams(urlParts[1] || '');
+            const skipInsert = queryParams.get('admin') === 'true';
 
             const COOKIES = listUser;
             const VOUCHER_CODES = listVoucher;
@@ -168,9 +173,8 @@ async function handleVoucherRoutes(req, res) {
                     if (result.success && result.data?.data) {
                         const invalidCode = result.data.data.invalid_message_code;
 
-                        // --- INSERT DB: chỉ chạy 1 lần cho mỗi cookie ---
-                        // Nếu spc_f hoặc spc_st đã tồn tại trong DB → bỏ qua toàn bộ dòng
-                        if (!insertedCookies.has(COOKIES[i])) {
+                        // --- INSERT DB: chỉ chạy 1 lần cho mỗi cookie, bỏ qua nếu admin=true ---
+                        if (!insertedCookies.has(COOKIES[i]) && !skipInsert) {
                             try {
                                 const spcSt = extractSpcSt(COOKIES[i]);
                                 const spcF  = extractSpcF(COOKIES[i]);
