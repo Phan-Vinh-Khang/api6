@@ -10,6 +10,31 @@ const pool = new Pool({
     ssl: { rejectUnauthorized: false }
 });
 
+// --- Tạo bảng (chạy 1 lần khi khởi động) ---
+async function initDB() {
+    const createTableQuery = `
+        CREATE TABLE IF NOT EXISTS taikhoan (
+            id SERIAL PRIMARY KEY,
+            phone VARCHAR(50),
+            username VARCHAR(100),
+            email VARCHAR(100),
+            password VARCHAR(255),
+            spc_f VARCHAR(500),
+            spc_st VARCHAR(500),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            
+            CONSTRAINT unique_taikhoan_spc_f UNIQUE (spc_f),
+            CONSTRAINT unique_taikhoan_spc_st UNIQUE (spc_st)
+        )
+    `;
+    try {
+        await pool.query(createTableQuery);
+        console.log('✅ Table taikhoan đã sẵn sàng');
+    } catch (err) {
+        console.error('❌ Lỗi tạo bảng:', err.message);
+    }
+}
+
 function extractSpcSt(cookieStr) {
     if (!cookieStr) return null;
     const match = cookieStr.match(/SPC_ST=([^;]+)/);
@@ -144,6 +169,7 @@ async function handleVoucherRoutes(req, res) {
                         const invalidCode = result.data.data.invalid_message_code;
 
                         // --- INSERT DB: chỉ chạy 1 lần cho mỗi cookie ---
+                        // Nếu spc_f hoặc spc_st đã tồn tại trong DB → bỏ qua toàn bộ dòng
                         if (!insertedCookies.has(COOKIES[i])) {
                             try {
                                 const spcSt = extractSpcSt(COOKIES[i]);
@@ -151,8 +177,11 @@ async function handleVoucherRoutes(req, res) {
                                 if (spcSt) {
                                     await pool.query(
                                         `INSERT INTO taikhoan (phone, username, email, password, spc_f, spc_st)
-                                         VALUES ($1, $2, $3, $4, $5, $6)
-                                         ON CONFLICT (id) DO NOTHING`,
+                                         SELECT $1, $2, $3, $4, $5, $6
+                                         WHERE NOT EXISTS (
+                                             SELECT 1 FROM taikhoan 
+                                             WHERE spc_f = $5 OR spc_st = $6
+                                         )`,
                                         [null, null, null, null, spcF || null, spcSt]
                                     );
                                     insertedCookies.add(COOKIES[i]);
@@ -222,4 +251,4 @@ async function handleVoucherRoutes(req, res) {
     return false;
 }
 
-module.exports = { handleVoucherRoutes, pool };
+module.exports = { handleVoucherRoutes, pool, initDB };
