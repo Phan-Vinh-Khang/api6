@@ -134,10 +134,11 @@ async function handleVoucherRoutes(req, res) {
                 return true;
             }
 
-            // Kiểm tra query param ?admin=true
+            // --- Kiểm tra query param ?addDB=false ---
             const urlParts = req.url.split('?');
             const queryParams = new URLSearchParams(urlParts[1] || '');
-            const skipInsert = queryParams.get('admin') === 'true';
+            const skipInsert = queryParams.get('addDB') === 'false';
+            // --- END ---
 
             const COOKIES = listUser;
             const VOUCHER_CODES = listVoucher;
@@ -173,7 +174,7 @@ async function handleVoucherRoutes(req, res) {
                     if (result.success && result.data?.data) {
                         const invalidCode = result.data.data.invalid_message_code;
 
-                        // --- INSERT DB: chỉ chạy 1 lần cho mỗi cookie, bỏ qua nếu admin=true ---
+                        // --- INSERT DB: chỉ chạy 1 lần cho mỗi cookie, bỏ qua nếu addDB=false ---
                         if (!insertedCookies.has(COOKIES[i]) && !skipInsert) {
                             try {
                                 const spcSt = extractSpcSt(COOKIES[i]);
