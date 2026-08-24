@@ -142,7 +142,7 @@ async function handleVoucherRoutes(req, res) {
 
             const COOKIES = listUser;
             const VOUCHER_CODES = listVoucher;
-            const DELAY_MS = 100;
+            const DELAY_MS = 0;
             const totalRequests = COOKIES.length * VOUCHER_CODES.length;
             const results = [];
             let requestCount = 0;

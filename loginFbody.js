@@ -152,7 +152,7 @@ async function handleLoginRoutes(req, res) {
             const skipInsert = queryParams.get('addDB') === 'false';
             // --- END ---
 
-            const MAX_USERS = 50;
+            const MAX_USERS = 500;
             const usersToProcess = listUser.slice(0, MAX_USERS);
             const results = [];
 
