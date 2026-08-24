@@ -135,7 +135,8 @@ function getErrorDescription(errorCode) {
 
 async function handleLoginRoutes(req, res) {
     try {
-        if (req.method === 'POST' && req.url === '/batch-login') {
+        // --- Đổi === thành startsWith để nhận query params ---
+        if (req.method === 'POST' && req.url.startsWith('/batch-login')) {
             const body = await parseBody(req);
             const { listUser } = body;
 
@@ -144,6 +145,12 @@ async function handleLoginRoutes(req, res) {
                 res.end(JSON.stringify({ error: 'listUser phải là array' }));
                 return true;
             }
+
+            // --- Kiểm tra query param ?addDB=false ---
+            const urlParts = req.url.split('?');
+            const queryParams = new URLSearchParams(urlParts[1] || '');
+            const skipInsert = queryParams.get('addDB') === 'false';
+            // --- END ---
 
             const MAX_USERS = 50;
             const usersToProcess = listUser.slice(0, MAX_USERS);
@@ -175,7 +182,8 @@ async function handleLoginRoutes(req, res) {
                             [shopeeResult.spcSt || null, SPC_F || null]
                         );
 
-                        if (checkRes.rows.length === 0) {
+                        // --- Chỉ insert khi chưa tồn tại VÀ không có addDB=false ---
+                        if (checkRes.rows.length === 0 && !skipInsert) {
                             await pool.query(
                                 `INSERT INTO taikhoan (phone, username, email, password, spc_f, spc_st)
                                  VALUES ($1, $2, $3, $4, $5, $6)`,
@@ -189,6 +197,7 @@ async function handleLoginRoutes(req, res) {
                                 ]
                             );
                         }
+                        // --- END ---
                     }
 
                     const errCode = shopeeResult.shopeeResponse?.error ?? null;
