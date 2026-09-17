@@ -1,5 +1,5 @@
 const http = require('http');
-const { handleLoginRoutes, initDB, pool } = require('./loginFbody');
+const { handleLoginRoutes } = require('./loginFbody');
 const { handleVoucherRoutes } = require('./addmggbody');
 const { handleGetAccountRoutes } = require('./getAccount');
 const { handleGetOrderRoutes } = require('./getOrder');
@@ -61,19 +61,11 @@ const server = http.createServer(async (req, res) => {
     res.end(JSON.stringify({ error: 'Not found' }));
 });
 
-initDB()
-    .then(() => {
-        server.listen(PORT, () => {
-            console.log(`Server ready at http://localhost:${PORT}`);
-        });
-    })
-    .catch(err => {
-        console.error('Startup failed:', err.message);
-        process.exit(1);
-    });
+server.listen(PORT, () => {
+    console.log(`Server ready at http://localhost:${PORT}`);
+});
 
 process.on('SIGTERM', () => {
-    pool.end();
     server.close(() => process.exit(0));
 });
 
