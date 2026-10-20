@@ -7,7 +7,7 @@ const { handleTramavandonRoutes } = require('./tramavandon');
 const { handleGHNRoutes } = require('./ghn');
 const { handleGetSPCSTRoutes } = require('./getSPCST');
 
-const PORT = process.env.PORT || 3003;
+const PORT = process.env.PORT || 8080;
 
 const server = http.createServer(async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
